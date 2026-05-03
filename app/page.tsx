@@ -677,7 +677,11 @@ export default function Canvas() {
   };
 
   const handlePreset = (name: string) => {
-    setActivePreset(name); setCode(PRESETS[name]); handleParse(PRESETS[name]);
+    // If you still have a PRESETS object defined, use this:
+    if (typeof PRESETS !== 'undefined' && PRESETS[name]) {
+      setCode(PRESETS[name]);
+      handleParse(PRESETS[name]);
+    }
   };
   const handleReset = () => { setNodes([]); setEdges([]); setNodeCount(0); setError(''); };
   const clearTerminal = () => setTermLines([{ type:'system', text:'>_ Terminal cleared.' }]);
