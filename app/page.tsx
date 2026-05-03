@@ -605,7 +605,7 @@ export default function Canvas() {
 
     addLine('system', '>_ Running...');
     try {
-      const res = await fetch('http://127.0.0.1:3001/execute', {
+      const res = await fetch('https://cflow-api.codenestui.top/execute', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ code, stdin: inputs.join('\n') }),
       });
@@ -628,7 +628,7 @@ export default function Canvas() {
   const handleParse = async (codeToRun = code) => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('http://127.0.0.1:3001/parse', {
+      const res = await fetch('https://cflow-api.codenestui.top/parse', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ code: codeToRun }),
       });
