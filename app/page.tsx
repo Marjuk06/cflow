@@ -34,8 +34,8 @@ if (typeof window !== 'undefined') {
   loader.init().then((monaco) => {
   monaco.languages.registerCompletionItemProvider('c', {
     triggerCharacters: [' ', '\t', '(', '<', '"', '#'],
-    provideCompletionItems(model, position) {
-      const word  = model.getWordUntilPosition(position);
+provideCompletionItems(model: any, position: any) {
+        const word  = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber, endLineNumber: position.lineNumber,
         startColumn: word.startColumn, endColumn: word.endColumn,
@@ -64,8 +64,8 @@ if (typeof window !== 'undefined') {
     },
   });
   monaco.languages.registerHoverProvider('c', {
-    provideHover(model, position) {
-      const word = model.getWordAtPosition(position);
+provideHover(model: any, position: any) {
+        const word = model.getWordAtPosition(position);
       if (!word) return null;
       const tips: Record<string,string> = {
         ptintf:'⚠ Did you mean **printf**?', pritnf:'⚠ Did you mean **printf**?',
