@@ -179,7 +179,19 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
             </div>
           ) : (
             <>
-              <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-4 ml-2">78 HSC Problems</p>
+              {/* Dynamic Problem Count UI */}
+              <div className="mb-6 flex flex-col items-start gap-2 ml-2">
+                {/* Purple Glass Capsule */}
+                <div className="px-4 py-1.5 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-[11px] font-bold tracking-widest uppercase shadow-[0_0_15px_rgba(168,85,247,0.2)] backdrop-blur-md">
+                  {problems.length} problems
+                </div>
+                
+                {/* Grayed Subtitle */}
+                <p className="text-[10px] text-white/30 uppercase tracking-widest font-medium ml-1">
+                  Click to see code, flow chart and algorithm
+                </p>
+              </div>
+              
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 text-white/40">
                   <Loader2 size={24} className="animate-spin mb-2 text-purple-500" />

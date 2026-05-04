@@ -22,10 +22,11 @@ import {
 import Editor, { loader } from '@monaco-editor/react';
 import dagre from 'dagre';
 import '@xyflow/react/dist/style.css';
-import { Play, Download, RotateCcw, Terminal, Send, Eraser, AlignLeft } from 'lucide-react';
+import { Play, Download, RotateCcw, Terminal, Send, Eraser, AlignLeft, Network } from 'lucide-react';
 import Sidebar from '../components/sidebar';
 import AlgorithmPanel from '../components/AlgorithmPanel';
 import { supabase } from '../lib/supabase';
+import { toPng } from 'html-to-image';
 
 // ─────────────────────────────────────────────
 // MONACO C Completions
@@ -382,17 +383,159 @@ const Legend = () => (
     </div>
   </div>
 );
+// ─────────────────────────────────────────────
+// ADVANCED A4 JPG EXPORT (White Page + Algo + Code + Flowchart)
+// ─────────────────────────────────────────────
+const handleDownload = async (problem: any, currentCode: string) => {
+  const flowElement = document.querySelector('.react-flow') as HTMLElement;
+  if (!flowElement) return;
 
-// ─────────────────────────────────────────────
-// SVG EXPORT
-// ─────────────────────────────────────────────
-function downloadFlow() {
-  const svg = document.querySelector('.react-flow__renderer svg') as SVGElement | null;
-  if (!svg) return;
-  const blob = new Blob([svg.outerHTML], { type:'image/svg+xml' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'flowchart.svg'; a.click();
-}
+  try {
+    // 1. Capture the flowchart, forcing it into a High-Res Black & White mode
+    const flowDataUrl = await toPng(flowElement, {
+      pixelRatio: 3, // Ultra-high detail
+      skipFonts: true,
+      fontEmbedCSS: '',
+      onclone: (clonedDoc) => {
+        // This CSS magically restyles the cloned flowchart to black & white just for the photo
+        const style = clonedDoc.createElement('style');
+        style.innerHTML = `
+          .react-flow__panel, .react-flow__controls, .react-flow__minimap { display: none !important; }
+          .react-flow { background: #ffffff !important; }
+          .react-flow__node div { background: #ffffff !important; color: #000000 !important; border-color: #000000 !important; box-shadow: none !important; }
+          .react-flow__node-decision > div > div.absolute { background: #ffffff !important; border: 4px solid #000000 !important; }
+          .react-flow__node-decision > div > div.relative { color: #000000 !important; }
+          .react-flow__node-connector > div { background: #ffffff !important; border: 4px solid #000000 !important; }
+          .react-flow__node-connector > div > div { background: #000000 !important; }
+          .react-flow__edge-path { stroke: #000000 !important; stroke-width: 3px !important; }
+          .react-flow__edge.backEdge path { stroke-dasharray: 8 8 !important; }
+          .react-flow__edge textPath { fill: #000000 !important; font-weight: 900 !important; font-size: 16px !important; }
+          .react-flow__arrowhead polyline, .react-flow__arrowhead path { fill: #000000 !important; stroke: #000000 !important; }
+          .react-flow__background { display: none !important; }
+        `;
+        clonedDoc.head.appendChild(style);
+      }
+    });
+
+    // 2. Load the captured image
+    const img = new Image();
+    img.src = flowDataUrl;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+
+      // A4 Canvas Setup (300 DPI)
+      canvas.width = 2480; 
+      let currentY = 200;
+      const MARGIN = 160;
+      const CONTENT_WIDTH = canvas.width - (MARGIN * 2);
+
+      // Helper function for wrapping text naturally
+      const wrapText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
+        if (!text) return y;
+        const paragraphs = text.split('\n');
+        let tempY = y;
+        paragraphs.forEach(paragraph => {
+          const words = paragraph.split(' ');
+          let line = '';
+          for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+              ctx.fillText(line, x, tempY);
+              line = words[n] + ' ';
+              tempY += lineHeight;
+            } else { line = testLine; }
+          }
+          ctx.fillText(line, x, tempY);
+          tempY += lineHeight;
+        });
+        return tempY;
+      };
+
+      // Set baseline height for A4
+      let finalHeight = 3508; 
+      
+      // Calculate Code Box Height beforehand to adjust dynamic canvas size if needed
+      const codeLines = currentCode ? currentCode.split('\n') : [];
+      const codeBoxHeight = currentCode ? (codeLines.length * 55) + 80 : 0;
+
+      // Expand canvas vertically if the text/code is extremely long
+      if (currentY + codeBoxHeight + 1000 > finalHeight) {
+        finalHeight = currentY + codeBoxHeight + 1500;
+      }
+      canvas.height = finalHeight;
+
+      // Draw Pure White Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 3. Draw Title
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 80px Arial, sans-serif';
+      const docTitle = problem?.title || 'Flowchart & Algorithm';
+      currentY = wrapText(docTitle, MARGIN, currentY, CONTENT_WIDTH, 100);
+      currentY += 80;
+
+      // 4. Draw Algorithms (if they exist)
+      if (problem?.algorithm_en || problem?.algorithm_bn) {
+        ctx.font = 'bold 50px Arial, sans-serif';
+        ctx.fillText('Algorithm:', MARGIN, currentY);
+        currentY += 80;
+        ctx.font = '40px Arial, sans-serif';
+        if (problem?.algorithm_en) {
+          currentY = wrapText(problem.algorithm_en, MARGIN, currentY, CONTENT_WIDTH, 60);
+          currentY += 40;
+        }
+        if (problem?.algorithm_bn) {
+          currentY = wrapText(problem.algorithm_bn, MARGIN, currentY, CONTENT_WIDTH, 60);
+          currentY += 60;
+        }
+      }
+
+      // 5. Draw Code
+      if (currentCode && currentCode.trim()) {
+        ctx.font = 'bold 50px Arial, sans-serif';
+        ctx.fillText('C Code:', MARGIN, currentY);
+        currentY += 80;
+
+        ctx.fillStyle = '#f8f9fa';
+        ctx.beginPath();
+        ctx.roundRect(MARGIN, currentY, CONTENT_WIDTH, codeBoxHeight, 20);
+        ctx.fill();
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '38px monospace';
+        codeLines.forEach((line, i) => {
+          ctx.fillText(line, MARGIN + 40, currentY + 80 + (i * 55));
+        });
+        currentY += codeBoxHeight + 120;
+      }
+
+      // 6. Draw Flowchart Image
+      const availableHeight = canvas.height - currentY - MARGIN;
+      let imgDrawWidth = CONTENT_WIDTH;
+      let imgDrawHeight = imgDrawWidth * (img.height / img.width);
+
+      // Scale to fit available A4 height while preserving aspect ratio
+      if (imgDrawHeight > availableHeight) {
+        imgDrawHeight = availableHeight;
+        imgDrawWidth = imgDrawHeight * (img.width / img.height);
+      }
+
+      const drawX = MARGIN + (CONTENT_WIDTH - imgDrawWidth) / 2;
+      ctx.drawImage(img, drawX, currentY, imgDrawWidth, imgDrawHeight);
+       
+      // 7. Trigger the Download
+      const link = document.createElement('a');
+      link.download = `${docTitle.replace(/\\s+/g, '_')}_Document.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 1.0);
+      link.click();
+    };
+  } catch (err) {
+    console.error('Failed to export image', err);
+  }
+};
 
 // ─────────────────────────────────────────────
 // PRESETS
@@ -493,6 +636,8 @@ export default function Canvas() {
   const [loading, setLoading]            = useState(false);
   const [error, setError]                = useState('');
   const [nodeCount, setNodeCount]        = useState(0);
+  const [isTerminalVisible, setIsTerminalVisible] = useState(false);
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
   
   // Dynamic Recent Problems State (Now fetching algorithms too!)
   const [recentProblems, setRecentProblems] = useState<{id: number, title: string, code: string, algorithm_en?: string, algorithm_bn?: string}[]>([]);
@@ -559,24 +704,31 @@ export default function Canvas() {
     if (waitingForInput) inputRef.current?.focus();
   }, [waitingForInput]);
 
-  // Drag resize
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
+  // Drag resize (Supports Mouse + Touch)
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     isDragging.current = true;
-    dragStartY.current = e.clientY;
+    dragStartY.current = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartH.current = termHeight;
-    e.preventDefault();
   }, [termHeight]);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging.current) return;
-      const delta = dragStartY.current - e.clientY;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const delta = dragStartY.current - clientY;
       setTermHeight(Math.max(120, Math.min(600, dragStartH.current + delta)));
     };
     const onUp = () => { isDragging.current = false; };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => { 
+      window.removeEventListener('mousemove', onMove); 
+      window.removeEventListener('mouseup', onUp); 
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
   }, []);
 
   const addLine = useCallback((type: TermLine['type'], text: string) => {
@@ -585,6 +737,7 @@ export default function Canvas() {
 
   // Interactive run
   const handleRun = async () => {
+    setIsTerminalVisible(true);
     if (isRunning) return;
     setIsRunning(true);
     setTermLines([{ type:'system', text:'>_ Compiling...' }]);
@@ -751,11 +904,35 @@ export default function Canvas() {
               setActiveProblem(null); 
             }}
             title="Clear Editor"
-            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-md text-white/30 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-md text-white/60 bg-white/5 hover:text-red-300 hover:bg-red-500/10 border border-white/5 transition-colors"
           >
             <Eraser size={12} />
             Clear
           </button>
+        </div>
+{/* ── FROSTED GLASS ACTION HEADER ── */}
+        <div className="relative z-20 flex gap-2 p-3 bg-black/30 backdrop-blur-xl border-b border-white/10 overflow-x-auto no-scrollbar">
+          <div className="absolute inset-0 bg-purple-500/10 blur-[120px] pointer-events-none" />
+          
+          <button onClick={handleRun} disabled={isRunning}
+            className="flex-1 flex items-center justify-center gap-2 bg-green-600/25 hover:bg-green-600/40 border border-green-500/50 rounded-xl py-2.5 px-4 font-bold text-sm text-green-300 shadow-[0_0_15px_rgba(34,197,94,0.15)] transition-all whitespace-nowrap">
+            <Play size={15} />{isRunning?'...':'Run'}
+          </button>
+          
+          <button onClick={() => handleParse()} disabled={loading}
+            className="flex-1 flex items-center justify-center gap-2 bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/50 rounded-xl py-2.5 px-4 font-bold text-sm text-white shadow-[0_0_15px_rgba(168,85,247,0.15)] transition-all whitespace-nowrap">
+            <Play size={15} />{loading?'Parsing...':'Generate'}
+          </button>
+          
+          <button onClick={handleReset} title="Clear canvas" className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all">
+            <RotateCcw size={15} />
+          </button>
+          
+         <button onClick={() => handleDownload(activeProblem, code)} title="Export Document" className="px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-all">
+            <Download size={15} />
+          </button>
+
+        
         </div>
 
         {/* Monaco */}
@@ -767,17 +944,18 @@ export default function Canvas() {
         </div>
 
         {/* ── RESIZABLE TERMINAL ── */}
+        {isTerminalVisible && (
         <div style={{ height: termHeight, minHeight:120, maxHeight:600 }}
           className="flex flex-col border-t border-white/10 bg-[#05050a] relative select-none">
 
-          {/* Drag handle */}
-          <div onMouseDown={handleDragStart}
-            className="absolute top-0 left-0 right-0 h-[6px] cursor-row-resize z-20 flex items-center justify-center group"
+         {/* Drag handle */}
+          <div onMouseDown={handleDragStart} onTouchStart={handleDragStart}
+            className="absolute top-0 left-0 right-0 h-[8px] cursor-row-resize z-20 flex items-center justify-center group"
             style={{ touchAction:'none' }}>
             <div className="w-12 h-[3px] rounded-full bg-white/10 group-hover:bg-purple-500/60 transition-colors" />
           </div>
 
-          {/* Terminal header */}
+         {/* Terminal header */}
           <div className="flex items-center justify-between px-4 pt-4 pb-1.5 border-b border-white/5 bg-black/40">
             <div className="flex items-center gap-2">
               <Terminal size={12} className="text-green-400" />
@@ -785,7 +963,10 @@ export default function Canvas() {
               {isRunning && <span className="text-[10px] text-green-400 animate-pulse ml-1">● Running</span>}
               {waitingForInput && <span className="text-[10px] text-yellow-400 animate-pulse ml-1">⌨ Waiting for input…</span>}
             </div>
-            <button onClick={clearTerminal} className="text-[10px] text-white/25 hover:text-white/60 transition-colors">Clear</button>
+            <div className="flex items-center gap-3">
+              <button onClick={clearTerminal} className="text-[10px] font-bold text-white/60 hover:text-white transition-colors bg-white/5 px-2 py-1 rounded">Clear</button>
+              <button onClick={() => setIsTerminalVisible(false)} className="text-[10px] font-bold text-red-400 hover:text-red-300 transition-colors bg-red-500/10 px-2 py-1 rounded">Close</button>
+            </div>
           </div>
 
           {/* Output */}
@@ -802,30 +983,23 @@ export default function Canvas() {
             {!isRunning && !waitingForInput && <div className="text-green-400/30 animate-pulse">█</div>}
           </div>
 
-          {/* Input row */}
-          <div className={`flex items-center gap-2 px-4 py-2 border-t transition-colors ${
-            waitingForInput ? 'border-yellow-500/40 bg-yellow-950/20' : 'border-white/5 bg-black/30'
-          }`}>
-            <span className={`font-mono text-sm ${waitingForInput ? 'text-yellow-400' : 'text-white/20'}`}>
-              {waitingForInput ? '›' : '$'}
-            </span>
-            <input ref={inputRef} type="text" value={termInput}
-              onChange={e => setTermInput(e.target.value)}
-              onKeyDown={e => e.key==='Enter' && submitTermInput()}
-              disabled={!waitingForInput}
-              placeholder={waitingForInput ? 'Type value and press Enter…' : 'Run program to interact…'}
-              className={`flex-1 bg-transparent font-mono text-sm outline-none transition-colors
-                ${waitingForInput
-                  ? 'text-yellow-200 placeholder:text-yellow-700/60 cursor-text'
-                  : 'text-white/20 placeholder:text-white/15 cursor-not-allowed'}`} />
-            {waitingForInput && (
+          {/* Input row - Only visible when program asks for input */}
+          {waitingForInput && (
+            <div className="flex items-center gap-2 px-4 py-2 border-t border-yellow-500/40 bg-yellow-950/20 transition-colors">
+              <span className="font-mono text-sm text-yellow-400">›</span>
+              <input ref={inputRef} type="text" value={termInput}
+                onChange={e => setTermInput(e.target.value)}
+                onKeyDown={e => e.key==='Enter' && submitTermInput()}
+                placeholder="Type value and press Enter…"
+                className="flex-1 bg-transparent font-mono text-sm outline-none transition-colors text-yellow-200 placeholder:text-yellow-700/60 cursor-text" />
               <button onClick={submitTermInput}
                 className="p-1 rounded bg-yellow-600/30 hover:bg-yellow-600/50 text-yellow-300 transition-colors">
                 <Send size={12} />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+        )}
 
         {error && (
           <div className="mx-4 mb-2 px-4 py-2 bg-red-950/60 border border-red-500/30 rounded-lg text-red-300 text-xs">
@@ -833,31 +1007,8 @@ export default function Canvas() {
           </div>
         )}
 
-        {/* Action bar */}
-        <div className="p-4 border-t border-white/8 flex gap-2">
-          <button onClick={handleRun} disabled={isRunning}
-            className="px-4 flex items-center gap-2 bg-green-600/25 hover:bg-green-600/45
-                       border border-green-500/50 rounded-xl py-2.5 font-bold text-sm
-                       shadow-[0_0_20px_rgba(34,197,94,0.22)] text-green-300
-                       disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-            <Play size={15} />{isRunning?'…':'Run'}
-          </button>
-          <button onClick={() => handleParse()} disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 bg-purple-600/25 hover:bg-purple-600/45
-                       border border-purple-500/50 rounded-xl py-2.5 font-bold text-sm
-                       shadow-[0_0_20px_rgba(168,85,247,0.22)] text-white
-                       disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-            <Play size={15} />{loading?'Parsing…':'Generate Flowchart'}
-          </button>
-          <button onClick={downloadFlow} title="Export SVG"
-            className="px-3 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white/55 hover:text-white">
-            <Download size={15} />
-          </button>
-          <button onClick={handleReset} title="Clear canvas"
-            className="px-3 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white/55 hover:text-white">
-            <RotateCcw size={15} />
-          </button>
-        </div>
+        {/* Mobile Spacer: Prevents bottom nav from overlapping terminal */}
+        <div className="h-24 md:hidden shrink-0 bg-[#05050a] border-t border-white/5 w-full"></div>
       </div>
 
       {/* ── RIGHT PANEL ── */}
@@ -884,7 +1035,11 @@ export default function Canvas() {
             fitView fitViewOptions={{ padding:0.18 }}
             colorMode="dark" minZoom={0.1} maxZoom={2.5}>
             <Background color="rgba(255,255,255,0.03)" gap={24} size={1} />
-            <Controls className="!bg-black/70 !border-white/10 backdrop-blur-md" showInteractive={false} />
+            <Controls 
+              position="top-left" 
+              className="!bg-black/40 !border-white/10 backdrop-blur-xl !mt-[68px] md:!mt-4 !ml-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)]" 
+              showInteractive={false} 
+            />
             <MiniMap
               nodeColor={n => {
                 if (n.type==='terminal')  return '#7c3aed';
@@ -894,8 +1049,30 @@ export default function Canvas() {
                 return '#334155';
               }}
               maskColor="rgba(0,0,0,0.6)"
-              className="!bg-black/70 !border-white/10 backdrop-blur-md" />
-            <Panel position="top-right"><Legend /></Panel>
+              className="hidden md:block !bg-black/30 !border-white/20 backdrop-blur-xl" />
+            
+            <Panel position="top-right" className="!mt-4 !mr-4 md:!mt-4 md:!mr-4">
+              {/* PC View */}
+              <div className="hidden md:block"><Legend /></div>
+              
+              {/* Mobile View Toggle */}
+              <div className="md:hidden">
+                {isLegendOpen ? (
+                  <div className="relative">
+                    <button onClick={() => setIsLegendOpen(false)} 
+                      className="absolute -top-3 -left-3 bg-black/80 border border-white/20 backdrop-blur-xl rounded-full w-8 h-8 flex items-center justify-center z-10 text-white font-bold">
+                      ✕
+                    </button>
+                    <Legend />
+                  </div>
+                ) : (
+                  <button onClick={() => setIsLegendOpen(true)} 
+                    className="bg-black/40 backdrop-blur-xl border border-white/10 w-10 h-10 rounded-full flex items-center justify-center text-white/80 font-bold shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+                    ℹ
+                  </button>
+                )}
+              </div>
+            </Panel>
           </ReactFlow>
         )}
 
@@ -942,7 +1119,7 @@ export default function Canvas() {
           onClick={() => setMobileTab('flowchart')} 
           className={`flex-1 py-3 rounded-lg flex justify-center items-center gap-2 text-xs font-bold transition-all ${mobileTab === 'flowchart' ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
         >
-          <RotateCcw size={16} className="rotate-180" /> Flowchart
+          <Network size={16} /> Flowchart
         </button>
       </div>
     </div>
