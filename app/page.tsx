@@ -396,7 +396,8 @@ const handleDownload = async (problem: any, currentCode: string) => {
       pixelRatio: 3, // Ultra-high detail
       skipFonts: true,
       fontEmbedCSS: '',
-      onclone: (clonedDoc) => {
+      // @ts-ignore - html-to-image types are missing onclone
+      onclone: (clonedDoc: any) => {
         // This CSS magically restyles the cloned flowchart to black & white just for the photo
         const style = clonedDoc.createElement('style');
         style.innerHTML = `
