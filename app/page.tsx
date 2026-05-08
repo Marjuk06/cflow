@@ -764,9 +764,34 @@ export default function Canvas() {
         body: JSON.stringify({ code, stdin: inputs.join('\n') }),
       });
       const data = await res.json();
-      if (data.error?.trim()) data.error.trim().split('\n').forEach((l:string) => addLine('error', l));
-      if (data.output?.trim()) data.output.trim().split('\n').forEach((l:string) => addLine('output', l));
-      if (!data.error?.trim() && !data.output?.trim()) addLine('system','Program exited (no output).');
+      
+      if (data.error?.trim()) {
+        data.error.trim().split('\n').forEach((l:string) => addLine('error', l));
+      }
+      
+      if (data.output?.trim()) {
+        let cleanedOutput = data.output;
+        
+        // ── SMART OUTPUT FILTER ──
+        // Finds any printf("...") that is immediately followed by a scanf
+        // and strips that exact prompt text from the final terminal output!
+        const promptRegex = /(?:printf|puts)\s*\(\s*"([^"]+)"\s*\)\s*;\s*(?:\/\/[^\n]*\n\s*)*scanf/g;
+        let match;
+        
+        while ((match = promptRegex.exec(code)) !== null) {
+          // match[1] is the exact text inside the printf, e.g., "Enter two numbers: "
+          cleanedOutput = cleanedOutput.replace(match[1], '');
+        }
+        
+        // Print the beautifully cleaned final output
+        cleanedOutput.trim().split('\n').forEach((l:string) => {
+          if (l.trim()) addLine('output', l.trim());
+        });
+      }
+      
+      if (!data.error?.trim() && !data.output?.trim()) {
+        addLine('system','Program exited (no output).');
+      }
     } catch (err:any) {
       addLine('error', `Cannot connect: ${err.message}`);
     }
