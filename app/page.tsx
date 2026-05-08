@@ -680,6 +680,14 @@ export default function Canvas() {
       if (data) setRecentProblems(data);
     };
     fetchRecent();
+
+    // Listen for instant database changes
+    const channel = supabase.channel('realtime-topbar')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_problems' }, () => {
+        fetchRecent(); // Auto-refresh when admin saves!
+      }).subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const [termLines, setTermLines]   = useState<TermLine[]>([

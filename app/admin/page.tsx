@@ -231,6 +231,22 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 // MAIN ADMIN COMPONENT
 // ─────────────────────────────────────────────
 export default function AdminDashboard() {
+  // ── AUTHENTICATION STATE ──
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [authError, setAuthError] = useState(false);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcode === 'marjuk06') {
+      setIsAuthenticated(true);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+      setPasscode('');
+    }
+  };
+
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -425,6 +441,34 @@ export default function AdminDashboard() {
       <Check className="absolute left-0 top-0 text-white w-4 h-4 p-[2px] opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity" />
     </div>
   );
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#080b10] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-900/20 rounded-full blur-[120px] pointer-events-none" />
+        <div className="relative z-10 w-full max-w-md bg-black/30 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-[0_0_40px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300">
+          <div className="text-center mb-8">
+            <div className="inline-flex p-3 bg-purple-500/20 rounded-xl mb-4 border border-purple-500/30">
+              <Database className="text-purple-400" size={28} />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-wide">C-Flow Admin</h1>
+            <p className="text-xs text-white/40 uppercase tracking-widest mt-2">Restricted Access</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <input type="password" autoFocus placeholder="Enter Admin Passcode" value={passcode}
+                onChange={(e) => { setPasscode(e.target.value); setAuthError(false); }}
+                className={`w-full bg-black/40 border ${authError ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-purple-500/50'} rounded-xl p-3.5 text-center text-white tracking-widest outline-none transition-all`} />
+              {authError && <p className="text-red-400 text-xs text-center mt-2 font-medium animate-pulse">Incorrect passcode</p>}
+            </div>
+            <button type="submit" className="w-full py-3.5 bg-purple-600/80 hover:bg-purple-500 backdrop-blur-md border border-purple-500/50 text-white rounded-xl font-bold shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all">
+              Unlock Dashboard
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-[#080b10] text-white flex flex-col font-sans overflow-hidden selection:bg-purple-500/30">

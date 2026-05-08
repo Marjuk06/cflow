@@ -40,7 +40,17 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchProblems(); }, []);
+  useEffect(() => { 
+    fetchProblems(); 
+
+    // Listen for instant database changes
+    const channel = supabase.channel('realtime-sidebar')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'practice_problems' }, () => {
+        fetchProblems(); // Auto-refresh when admin saves!
+      }).subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // Handles both Create New AND Update Existing
   const handleUpload = async () => {
