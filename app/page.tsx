@@ -749,7 +749,10 @@ export default function Canvas() {
     setIsTerminalVisible(true);
     if (isRunning) return;
     setIsRunning(true);
-    setTermLines([{ type:'system', text:'>_ Compiling...' }]);
+    setTermLines([
+  { type:'system', text:'>_ Initializing execution engine...' },
+  { type:'system', text:'>_ Note: Server may take 30s to wake up on first run.' }
+]);
     const vars = detectScanfVars(code);
     const inputs: string[] = [];
 
@@ -767,7 +770,8 @@ export default function Canvas() {
 
     addLine('system', '>_ Running...');
     try {
-      const res = await fetch('https://cflow-api.codenestui.top/execute', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://cflow-backend.onrender.com';
+      const res = await fetch(`${apiUrl}/execute`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ code, stdin: inputs.join('\n') }),
       });
@@ -815,7 +819,8 @@ export default function Canvas() {
   const handleParse = async (codeToRun = code) => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('https://cflow-api.codenestui.top/parse', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://cflow-backend.onrender.com';
+      const res = await fetch(`${apiUrl}/parse`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ code: codeToRun }),
       });
