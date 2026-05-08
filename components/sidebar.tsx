@@ -25,7 +25,6 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
   const [editingId, setEditingId] = useState<number | null>(null); // Tracks if we are editing vs creating
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('');
-  const [newAlgoEn, setNewAlgoEn] = useState('');
   const [newAlgoBn, setNewAlgoBn] = useState('');
   
   const [isUploading, setIsUploading] = useState(false);
@@ -50,7 +49,7 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
 
     const payload = { 
       title: newTitle, category: newCategory, code: currentCode,
-      algorithm_en: newAlgoEn, algorithm_bn: newAlgoBn 
+      algorithm_bn: newAlgoBn 
     };
 
     let error;
@@ -80,7 +79,7 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
   };
 
   const resetForm = () => {
-    setEditingId(null); setNewTitle(''); setNewCategory(''); setNewAlgoEn(''); setNewAlgoBn('');
+    setEditingId(null); setNewTitle(''); setNewCategory(''); setNewAlgoBn('');
   };
 
   // Triggers Edit Mode
@@ -89,7 +88,6 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
     setEditingId(p.id);
     setNewTitle(p.title);
     setNewCategory(p.category);
-    setNewAlgoEn(p.algorithm_en || '');
     setNewAlgoBn(p.algorithm_bn || '');
     setIsUploadMode(true); // Open the form!
   };
@@ -160,12 +158,8 @@ export default function Sidebar({ onSelectProblem, currentCode }: { onSelectProb
                 <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="w-full mt-1 bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:border-purple-500/60" />
               </div>
               <div>
-                <label className="text-xs text-white/50 pl-1">Algorithm (English)</label>
-                <textarea value={newAlgoEn} onChange={(e) => setNewAlgoEn(e.target.value)} rows={3} className="w-full mt-1 bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:border-purple-500/60 resize-none" />
-              </div>
-              <div>
-                <label className="text-xs text-white/50 pl-1">অ্যালগরিদম (বাংলা)</label>
-                <textarea value={newAlgoBn} onChange={(e) => setNewAlgoBn(e.target.value)} rows={3} className="w-full mt-1 bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:border-purple-500/60 resize-none font-sans" />
+                <label className="text-xs text-white/50 pl-1">অ্যালগরিদম (বাংলা / Math)</label>
+                <textarea value={newAlgoBn} onChange={(e) => setNewAlgoBn(e.target.value)} rows={6} placeholder="ধাপ-১: শুরু করি।&#10;ধাপ-২: $A$ ও $B$ ইনপুট নিই..." className="w-full mt-1 bg-black/40 border border-white/10 rounded-lg p-2.5 text-sm text-white outline-none focus:border-purple-500/60 resize-y font-sans" />
               </div>
 
               <div className="bg-black/30 rounded-lg p-3 border border-white/5 text-xs text-white/40 font-mono line-clamp-2">
